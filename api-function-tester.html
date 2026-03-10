@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Function Tester</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── Layout ── */
+.app { display: grid; grid-template-columns: 300px 1fr; height: 100vh; overflow: hidden; }
+
+/* ── Sidebar ── */
+.sidebar { background: #161b27; border-right: 1px solid #1e2535; display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-header { padding: 16px; border-bottom: 1px solid #1e2535; display: flex; align-items: center; justify-content: space-between; }
+.sidebar-title { font-size: 0.82rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; }
+.fn-list { flex: 1; overflow-y: auto; padding: 8px; }
+.fn-item { padding: 10px 12px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; border: 1.5px solid transparent; transition: all 0.15s; }
+.fn-item:hover { background: #1e2535; }
+.fn-item.active { background: #1e2a4a; border-color: #3b5bdb; }
+.fn-item-name { font-size: 0.88rem; font-weight: 600; color: #e2e8f0; }
+.fn-item-meta { font-size: 0.72rem; color: #64748b; margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+.method-pill { font-size: 0.65rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
+.pill-post { background: #7c3aed22; color: #a78bfa; border: 1px solid #7c3aed44; }
+.pill-get  { background: #059669222; color: #6ee7b7; border: 1px solid #05966944; }
+.pill-put  { background: #d9770622; color: #fbbf24; border: 1px solid #d9770644; }
+.pill-patch{ background: #0ea5e922; color: #67e8f9; border: 1px solid #0ea5e944; }
+.empty-sidebar { text-align: center; padding: 40px 16px; color: #374151; font-size: 0.82rem; line-height: 1.6; }
+
+/* ── Main Panel ── */
+.main { display: flex; flex-direction: column; overflow: hidden; background: #0f1117; }
+
+/* Welcome screen */
+.welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #374151; }
+.welcome-icon { font-size: 3.5rem; }
+.welcome-title { font-size: 1.1rem; font-weight: 600; color: #4b5563; }
+.welcome-sub { font-size: 0.82rem; color: #374151; }
+
+/* Function editor */
+.fn-editor { flex: 1; overflow-y: auto; padding: 20px; }
+.fn-tester  { flex: 1; overflow-y: auto; padding: 20px; display: none; }
+
+/* ── Buttons ── */
+.btn { padding: 7px 14px; border: none; border-radius: 7px; cursor: pointer; font-size: 0.82rem; font-weight: 600; transition: all 0.15s; display: inline-flex; align-items: center; gap: 5px; }
+.btn-primary  { background: #3b5bdb; color: white; }
+.btn-primary:hover  { background: #2f4ac4; }
+.btn-success  { background: #059669; color: white; }
+.btn-success:hover  { background: #047857; }
+.btn-ghost    { background: transparent; color: #64748b; border: 1px solid #1e2535; }
+.btn-ghost:hover    { background: #1e2535; color: #94a3b8; }
+.btn-danger   { background: #7f1d1d22; color: #f87171; border: 1px solid #7f1d1d44; }
+.btn-danger:hover   { background: #7f1d1d44; }
+.btn-sm { padding: 4px 10px; font-size: 0.75rem; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Form ── */
+.section { background: #161b27; border: 1px solid #1e2535; border-radius: 10px; padding: 18px; margin-bottom: 14px; }
+.section-title { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px; }
+label { display: block; font-size: 0.78rem; font-weight: 500; color: #94a3b8; margin-bottom: 5px; }
+input[type="text"], input[type="url"], textarea, select {
+  width: 100%; padding: 8px 11px; background: #0f1117; border: 1.5px solid #1e2535;
+  border-radius: 7px; font-size: 0.85rem; font-family: inherit; color: #e2e8f0;
+  transition: border-color 0.15s;
+}
+input:focus, textarea:focus, select:focus { outline: none; border-color: #3b5bdb; box-shadow: 0 0 0 3px #3b5bdb18; }
+textarea { resize: vertical; }
+select option { background: #161b27; }
+.fg { margin-bottom: 12px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row3 { display: grid; grid-template-columns: 110px 1fr; gap: 10px; }
+.hint { font-size: 0.72rem; color: #475569; margin-top: 4px; }
+
+/* ── Params ── */
+.param-row { background: #0f1117; border: 1px solid #1e2535; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+.param-grid { display: grid; grid-template-columns: 1fr 90px auto 1.5fr; gap: 8px; align-items: end; }
+.req-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.req-wrap label { font-size: 0.68rem; margin: 0; }
+.req-cb { width: 16px; height: 16px; cursor: pointer; accent-color: #3b5bdb; }
+.req-tag { font-size: 0.65rem; font-family: monospace; font-weight: 800; }
+.req-on { color: #818cf8; }
+.req-off { color: #374151; }
+.param-del { color: #f87171; background: none; border: none; cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px 4px; transition: color 0.15s; align-self: flex-end; }
+.param-del:hover { color: #ef4444; }
+
+/* ── Header rows ── */
+.hdr-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-bottom: 7px; align-items: center; }
+
+/* ── Run panel ── */
+.run-header { padding: 14px 20px; border-bottom: 1px solid #1e2535; display: flex; align-items: center; justify-content: space-between; background: #161b27; }
+.fn-run-name { font-size: 1rem; font-weight: 700; color: #e2e8f0; display: flex; align-items: center; gap: 10px; }
+.run-body { display: grid; grid-template-columns: 340px 1fr; gap: 0; flex: 1; overflow: hidden; }
+.run-inputs { padding: 18px; border-right: 1px solid #1e2535; overflow-y: auto; background: #161b27; }
+.run-output { padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+
+.param-input-row { margin-bottom: 12px; }
+.param-input-label { font-size: 0.78rem; font-weight: 600; color: #94a3b8; margin-bottom: 4px; display: flex; align-items: center; gap-6px; }
+.req-badge { font-size: 0.65rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+.rb-req { background: #3b5bdb22; color: #818cf8; border: 1px solid #3b5bdb44; }
+.rb-opt { background: #1e2535; color: #475569; }
+.param-input-desc { font-size: 0.71rem; color: #475569; margin-top: 3px; line-height: 1.4; }
+
+/* ── Request / Response boxes ── */
+.box { background: #161b27; border: 1px solid #1e2535; border-radius: 9px; overflow: hidden; }
+.box-header { padding: 9px 14px; border-bottom: 1px solid #1e2535; display: flex; align-items: center; justify-content: space-between; }
+.box-label { font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+.box-body { padding: 14px; font-family: 'Courier New', monospace; font-size: 0.78rem; color: #94a3b8; white-space: pre-wrap; word-break: break-all; line-height: 1.6; max-height: 320px; overflow-y: auto; }
+.status-line { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid #1e2535; font-size: 0.78rem; font-family: monospace; }
+.status-ok  { color: #4ade80; }
+.status-err { color: #f87171; }
+.status-pending { color: #94a3b8; }
+
+.key   { color: #93c5fd; }
+.str   { color: #86efac; }
+.num   { color: #fbbf24; }
+.bool  { color: #f9a8d4; }
+.null  { color: #94a3b8; }
+.punc  { color: #64748b; }
+
+.placeholder-box { display: flex; align-items: center; justify-content: center; height: 120px; color: #374151; font-size: 0.82rem; border: 1.5px dashed #1e2535; border-radius: 9px; }
+
+/* ── History ── */
+.history-section { margin-top: 12px; }
+.history-item { background: #161b27; border: 1px solid #1e2535; border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
+.history-header { padding: 8px 12px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.history-header:hover { background: #1e2535; }
+.history-time { font-size: 0.7rem; color: #475569; white-space: nowrap; }
+.history-fn { font-size: 0.78rem; font-weight: 600; color: #94a3b8; }
+.history-status { font-size: 0.7rem; font-weight: 700; font-family: monospace; margin-left: auto; }
+.hs-ok  { color: #4ade80; }
+.hs-err { color: #f87171; }
+.history-detail { padding: 12px; border-top: 1px solid #1e2535; display: none; }
+.history-detail.open { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ── Misc ── */
+.divider { border: none; border-top: 1px solid #1e2535; margin: 14px 0; }
+.flex { display: flex; }
+.gap-2 { gap: 8px; }
+.ic { align-items: center; }
+.jb { justify-content: space-between; }
+.mt-2 { margin-top: 8px; }
+.spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1e2535; border-radius: 4px; }
+</style>
+<style>
+/* ── Lock screen ── */
+#lockscreen {
+  position: fixed; inset: 0; background: #0f1117;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; flex-direction: column; gap: 0;
+}
+.lock-card {
+  background: #161b27; border: 1px solid #1e2535; border-radius: 16px;
+  padding: 40px 36px; width: 100%; max-width: 380px; text-align: center;
+}
+.lock-icon { font-size: 2.8rem; margin-bottom: 16px; }
+.lock-title { font-size: 1.1rem; font-weight: 700; color: #e2e8f0; margin-bottom: 6px; }
+.lock-sub { font-size: 0.8rem; color: #475569; margin-bottom: 28px; }
+.lock-input {
+  width: 100%; padding: 11px 14px; background: #0f1117; border: 1.5px solid #1e2535;
+  border-radius: 8px; font-size: 0.95rem; color: #e2e8f0; font-family: inherit;
+  text-align: center; letter-spacing: 0.1em; transition: border-color 0.15s;
+  margin-bottom: 12px;
+}
+.lock-input:focus { outline: none; border-color: #3b5bdb; box-shadow: 0 0 0 3px #3b5bdb18; }
+.lock-input.shake { animation: shake 0.35s ease; border-color: #ef4444; }
+.lock-btn {
+  width: 100%; padding: 11px; background: #3b5bdb; color: white; border: none;
+  border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+  transition: background 0.15s;
+}
+.lock-btn:hover { background: #2f4ac4; }
+.lock-error { font-size: 0.78rem; color: #f87171; margin-top: 10px; min-height: 18px; }
+.lock-hint { font-size: 0.7rem; color: #374151; margin-top: 20px; }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%      { transform: translateX(-8px); }
+  60%      { transform: translateX(8px); }
+  80%      { transform: translateX(-4px); }
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════ LOCK SCREEN ════════════ -->
+<div id="lockscreen">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">API Function Tester</div>
+    <div class="lock-sub">Ingresá la contraseña para continuar</div>
+    <input class="lock-input" type="password" id="lock-input"
+      placeholder="••••••••"
+      onkeydown="if(event.key==='Enter') unlock()"
+      autofocus />
+    <button class="lock-btn" onclick="unlock()">Ingresar</button>
+    <div class="lock-error" id="lock-error"></div>
+    <div class="lock-hint">Contactá al administrador si no tenés la clave</div>
+  </div>
+</div>
+
+<div class="app" id="app" style="display:none">
+
+  <!-- ════════════ SIDEBAR ════════════ -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">⚡ Funciones</span>
+      <button class="btn btn-primary btn-sm" onclick="newFn()">+ Nueva</button>
+    </div>
+    <div style="padding:8px;border-bottom:1px solid #1e2535;display:flex;gap:6px">
+      <button class="btn btn-ghost btn-sm" style="flex:1;font-size:0.72rem" onclick="exportFns()" title="Descargar funciones como JSON">⬇ Exportar</button>
+      <label class="btn btn-ghost btn-sm" style="flex:1;font-size:0.72rem;cursor:pointer;justify-content:center" title="Importar funciones desde JSON">⬆ Importar<input type="file" accept=".json" style="display:none" onchange="importFns(event)"></label>
+    </div>
+    <div class="fn-list" id="fn-list">
+      <div class="empty-sidebar">
+        Ninguna función registrada.<br>Hacé clic en <strong>+ Nueva</strong> para agregar.
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════ MAIN ════════════ -->
+  <div class="main" id="main">
+
+    <!-- Welcome -->
+    <div class="welcome" id="view-welcome">
+      <div class="welcome-icon">⚡</div>
+      <div class="welcome-title">API Function Tester</div>
+      <div class="welcome-sub">Creá una función y probá las llamadas a tu API en tiempo real</div>
+    </div>
+
+    <!-- Editor de función -->
+    <div style="display:none;flex-direction:column;overflow:hidden;flex:1" id="view-editor">
+      <div class="run-header">
+        <div class="fn-run-name" id="editor-title">Nueva función</div>
+        <div class="flex gap-2">
+          <button class="btn btn-danger btn-sm" id="btn-delete" onclick="deleteFn()" style="display:none">🗑 Eliminar</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelEdit()">Cancelar</button>
+          <button class="btn btn-primary btn-sm" onclick="saveFn()">💾 Guardar</button>
+        </div>
+      </div>
+      <div class="fn-editor" id="fn-editor">
+
+        <div class="section">
+          <div class="section-title">Identificación</div>
+          <div class="fg">
+            <label>Nombre de la función</label>
+            <input type="text" id="e-name" placeholder="ej: InfoMD, BuscarTurnos, VerificarSeguro" />
+          </div>
+          <div class="fg">
+            <label>Descripción (opcional)</label>
+            <input type="text" id="e-desc" placeholder="¿Para qué sirve esta función?" />
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Endpoint</div>
+          <div class="row3 fg">
+            <div>
+              <label>Método</label>
+              <select id="e-method">
+                <option>POST</option><option>GET</option><option>PUT</option><option>PATCH</option><option>DELETE</option>
+              </select>
+            </div>
+            <div>
+              <label>URL</label>
+              <input type="url" id="e-url" placeholder="https://api.ejemplo.com/endpoint?x-api-key=..." />
+            </div>
+          </div>
+          <div>
+            <div class="flex jb ic" style="margin-bottom:8px">
+              <label style="margin:0">Headers</label>
+              <button class="btn btn-ghost btn-sm" onclick="addHdr()">+ Header</button>
+            </div>
+            <div id="e-hdrs"></div>
+            <div class="hint">Útil para <code style="background:#0f1117;padding:1px 4px;border-radius:3px">Authorization</code>, <code style="background:#0f1117;padding:1px 4px;border-radius:3px">x-api-key</code>, etc.</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="flex jb ic" style="margin-bottom:14px">
+            <div class="section-title" style="margin:0">Parámetros</div>
+            <button class="btn btn-ghost btn-sm" onclick="addParam()">+ Parámetro</button>
+          </div>
+          <div id="e-params">
+            <div id="e-params-empty" style="font-size:0.78rem;color:#374151;padding:8px">Sin parámetros — hacé clic en "+ Parámetro" para agregar</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Tester de función -->
+    <div style="display:none;flex-direction:column;overflow:hidden;flex:1" id="view-tester">
+      <div class="run-header">
+        <div class="fn-run-name" id="tester-title">
+          <span id="tester-method-pill"></span>
+          <span id="tester-name"></span>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-ghost btn-sm" onclick="editFn()">✏️ Editar</button>
+          <button class="btn btn-success" id="run-btn" onclick="runCall()">▶ Ejecutar</button>
+        </div>
+      </div>
+
+      <div class="run-body">
+        <!-- Inputs -->
+        <div class="run-inputs">
+          <div style="font-size:0.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:14px">Parámetros</div>
+          <div id="run-params"></div>
+          <div style="margin-top:14px">
+            <div style="font-size:0.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">URL</div>
+            <div id="run-url-preview" style="font-family:monospace;font-size:0.73rem;color:#475569;background:#0f1117;padding:8px 10px;border-radius:6px;word-break:break-all;line-height:1.5"></div>
+          </div>
+        </div>
+
+        <!-- Output -->
+        <div class="run-output">
+
+          <!-- Request sent -->
+          <div class="box" id="box-request">
+            <div class="box-header">
+              <span class="box-label">📤 Request enviado</span>
+            </div>
+            <div class="placeholder-box" id="req-placeholder">Ejecutá la función para ver el request</div>
+            <div id="req-content" style="display:none">
+              <div class="status-line">
+                <span id="req-method-line" style="color:#a78bfa;font-weight:700"></span>
+                <span id="req-url-line" style="color:#94a3b8;word-break:break-all"></span>
+              </div>
+              <div class="box-body" id="req-body"></div>
+            </div>
+          </div>
+
+          <!-- Response received -->
+          <div class="box" id="box-response">
+            <div class="box-header">
+              <span class="box-label">📥 Respuesta recibida</span>
+              <span id="res-status-badge"></span>
+            </div>
+            <div class="placeholder-box" id="res-placeholder">Ejecutá la función para ver la respuesta</div>
+            <div id="res-content" style="display:none">
+              <div class="status-line" id="res-status-line"></div>
+              <div class="box-body" id="res-body"></div>
+            </div>
+          </div>
+
+          <!-- History -->
+          <div class="history-section" id="history-section" style="display:none">
+            <div style="font-size:0.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Historial de esta sesión</div>
+            <div id="history-list"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// ⚙️  CONFIGURACIÓN — cambiá esta contraseña antes de compartir
+// ─────────────────────────────────────────────────────────────
+const APP_PASSWORD = 'cambiame123';
+const SESSION_KEY  = 'api-tester-auth-v1';
+
+function unlock() {
+  const input = document.getElementById('lock-input');
+  const error = document.getElementById('lock-error');
+  if (input.value === APP_PASSWORD) {
+    sessionStorage.setItem(SESSION_KEY, '1');
+    document.getElementById('lockscreen').style.display = 'none';
+    document.getElementById('app').style.display = 'grid';
+    input.value = '';
+    error.textContent = '';
+    initApp();
+  } else {
+    error.textContent = 'Contraseña incorrecta';
+    input.classList.add('shake');
+    input.value = '';
+    setTimeout(() => input.classList.remove('shake'), 400);
+    setTimeout(() => { error.textContent = ''; }, 3000);
+  }
+}
+
+// Si ya autenticó en esta sesión del navegador, entrar directo
+if (sessionStorage.getItem(SESSION_KEY) === '1') {
+  document.getElementById('lockscreen').style.display = 'none';
+  document.getElementById('app').style.display = 'grid';
+}
+
+// ─────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'api-tester-fns-v1';
+
+const S = {
+  fns: loadFromStorage(),
+  activeFn: null,
+  editingId: null,
+  pCount: 0,
+  hCount: 0,
+  history: [],
+};
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveToStorage() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S.fns)); } catch {}
+}
+
+function exportFns() {
+  const data = JSON.stringify(S.fns, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'api-functions.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importFns(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) throw new Error('Formato inválido');
+      const count = imported.length;
+      if (!confirm(`¿Importar ${count} función${count !== 1 ? 'es' : ''}? Las funciones existentes se van a mantener.`)) return;
+      // Merge: skip duplicates by id, add new ones
+      const existingIds = new Set(S.fns.map(f => f.id));
+      const newFns = imported.filter(f => !existingIds.has(f.id));
+      S.fns.push(...newFns);
+      saveToStorage();
+      renderSidebar();
+      showView('welcome');
+      alert(`✅ ${newFns.length} función${newFns.length !== 1 ? 'es' : ''} importada${newFns.length !== 1 ? 's' : ''} correctamente`);
+    } catch (err) {
+      alert('❌ Error al importar: ' + err.message);
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// ─────────────────────────────────────────────────────────────
+// VIEWS
+// ─────────────────────────────────────────────────────────────
+function showView(name) {
+  ['welcome','editor','tester'].forEach(v => {
+    const el = document.getElementById('view-' + v);
+    if (v === 'welcome') el.style.display = name === v ? 'flex' : 'none';
+    else el.style.display = name === v ? 'flex' : 'none';
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// SIDEBAR
+// ─────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const el = document.getElementById('fn-list');
+  if (!S.fns.length) {
+    el.innerHTML = '<div class="empty-sidebar">Ninguna función registrada.<br>Hacé clic en <strong>+ Nueva</strong> para agregar.</div>';
+    return;
+  }
+  el.innerHTML = S.fns.map(fn => `
+    <div class="fn-item ${S.activeFn === fn.id ? 'active' : ''}" onclick="selectFn('${fn.id}')">
+      <div class="fn-item-name">${esc(fn.name || 'Sin nombre')}</div>
+      <div class="fn-item-meta">
+        <span class="method-pill pill-${fn.method.toLowerCase()}">${fn.method}</span>
+        <span>${fn.params.length} param${fn.params.length !== 1 ? 's' : ''}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectFn(id) {
+  S.activeFn = id;
+  renderSidebar();
+  openTester(id);
+}
+
+// ─────────────────────────────────────────────────────────────
+// NEW / EDIT
+// ─────────────────────────────────────────────────────────────
+function newFn() {
+  S.editingId = null;
+  S.pCount = 0; S.hCount = 0;
+  document.getElementById('editor-title').textContent = 'Nueva función';
+  document.getElementById('btn-delete').style.display = 'none';
+  document.getElementById('e-name').value = '';
+  document.getElementById('e-desc').value = '';
+  document.getElementById('e-method').value = 'POST';
+  document.getElementById('e-url').value = '';
+  document.getElementById('e-params').innerHTML = '<div id="e-params-empty" style="font-size:0.78rem;color:#374151;padding:8px">Sin parámetros — hacé clic en "+ Parámetro" para agregar</div>';
+  document.getElementById('e-hdrs').innerHTML = '';
+  showView('editor');
+}
+
+function editFn() {
+  if (!S.activeFn) return;
+  const fn = S.fns.find(f => f.id === S.activeFn);
+  if (!fn) return;
+  S.editingId = fn.id;
+  S.pCount = 0; S.hCount = 0;
+  document.getElementById('editor-title').textContent = `Editando: ${fn.name}`;
+  document.getElementById('btn-delete').style.display = 'inline-flex';
+  document.getElementById('e-name').value = fn.name;
+  document.getElementById('e-desc').value = fn.description || '';
+  document.getElementById('e-method').value = fn.method;
+  document.getElementById('e-url').value = fn.url;
+  document.getElementById('e-params').innerHTML = '';
+  document.getElementById('e-hdrs').innerHTML = '';
+  fn.params.forEach(p => addParam(p));
+  (fn.headers || []).forEach(h => addHdr(h));
+  if (!fn.params.length) resetParamsEmpty();
+  showView('editor');
+}
+
+function cancelEdit() {
+  if (S.activeFn) {
+    openTester(S.activeFn);
+  } else {
+    showView('welcome');
+  }
+}
+
+function deleteFn() {
+  if (!S.editingId) return;
+  if (!confirm('¿Eliminar esta función?')) return;
+  S.fns = S.fns.filter(f => f.id !== S.editingId);
+  saveToStorage();
+  if (S.activeFn === S.editingId) S.activeFn = null;
+  S.editingId = null;
+  renderSidebar();
+  showView('welcome');
+}
+
+function saveFn() {
+  const name = document.getElementById('e-name').value.trim();
+  const url  = document.getElementById('e-url').value.trim();
+  if (!name) { alert('El nombre es obligatorio'); return; }
+  if (!url)  { alert('La URL es obligatoria'); return; }
+
+  const params = [];
+  document.querySelectorAll('[id^="pn-"]').forEach(el => {
+    const i = el.id.slice(3);
+    const pname = el.value.trim();
+    if (!pname) return;
+    params.push({
+      name: pname,
+      type: document.getElementById(`pt-${i}`).value,
+      required: document.getElementById(`pr-${i}`).checked,
+      description: document.getElementById(`pd-${i}`).value.trim(),
+    });
+  });
+
+  const headers = [];
+  document.querySelectorAll('[id^="hk-"]').forEach(el => {
+    const i = el.id.slice(3);
+    const k = el.value.trim();
+    const v = document.getElementById(`hv-${i}`)?.value.trim();
+    if (k) headers.push({ key: k, value: v || '' });
+  });
+
+  const fn = {
+    id: S.editingId || String(Date.now()),
+    name,
+    description: document.getElementById('e-desc').value.trim(),
+    method: document.getElementById('e-method').value,
+    url,
+    params,
+    headers,
+  };
+
+  if (S.editingId) {
+    const idx = S.fns.findIndex(f => f.id === S.editingId);
+    S.fns[idx] = fn;
+  } else {
+    S.fns.push(fn);
+  }
+
+  saveToStorage();
+  S.activeFn = fn.id;
+  renderSidebar();
+  openTester(fn.id);
+}
+
+// ─────────────────────────────────────────────────────────────
+// PARAM / HEADER FORM
+// ─────────────────────────────────────────────────────────────
+function addParam(prefill = null) {
+  const container = document.getElementById('e-params');
+  const empty = document.getElementById('e-params-empty');
+  if (empty) empty.remove();
+
+  const id = S.pCount++;
+  const isReq = prefill ? prefill.required : false;
+  const div = document.createElement('div');
+  div.className = 'param-row';
+  div.id = `pb-${id}`;
+  div.innerHTML = `
+    <div class="param-grid">
+      <div>
+        <label>Nombre</label>
+        <input type="text" id="pn-${id}" placeholder="ej: Zona" value="${prefill ? esc(prefill.name) : ''}" />
+      </div>
+      <div>
+        <label>Tipo</label>
+        <select id="pt-${id}">
+          <option value="string"  ${(!prefill||prefill.type==='string')  ?'selected':''}>Texto</option>
+          <option value="number"  ${(prefill&&prefill.type==='number')   ?'selected':''}>Número</option>
+          <option value="boolean" ${(prefill&&prefill.type==='boolean')  ?'selected':''}>Boolean</option>
+        </select>
+      </div>
+      <div class="req-wrap">
+        <label>Obligatorio</label>
+        <input type="checkbox" class="req-cb" id="pr-${id}" ${isReq?'checked':''} onchange="updateReq(${id})" />
+        <span class="req-tag ${isReq?'req-on':'req-off'}" id="rl-${id}">${isReq?'[x]':'[ ]'}</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:6px">
+        <div style="flex:1">
+          <label>Descripción</label>
+          <input type="text" id="pd-${id}" placeholder="Instrucción para el agente sobre este parámetro" value="${prefill?esc(prefill.description):''}" />
+        </div>
+        <button class="param-del" onclick="removeParam(${id})" title="Quitar">✕</button>
+      </div>
+    </div>
+  `;
+  container.appendChild(div);
+}
+
+function removeParam(id) {
+  document.getElementById(`pb-${id}`)?.remove();
+  resetParamsEmpty();
+}
+
+function resetParamsEmpty() {
+  const c = document.getElementById('e-params');
+  if (!c.querySelector('.param-row')) {
+    c.innerHTML = '<div id="e-params-empty" style="font-size:0.78rem;color:#374151;padding:8px">Sin parámetros — hacé clic en "+ Parámetro" para agregar</div>';
+  }
+}
+
+function updateReq(id) {
+  const cb  = document.getElementById(`pr-${id}`);
+  const lbl = document.getElementById(`rl-${id}`);
+  lbl.textContent = cb.checked ? '[x]' : '[ ]';
+  lbl.className   = 'req-tag ' + (cb.checked ? 'req-on' : 'req-off');
+}
+
+function addHdr(prefill = null) {
+  const id = S.hCount++;
+  const div = document.createElement('div');
+  div.className = 'hdr-row';
+  div.id = `hr-${id}`;
+  div.innerHTML = `
+    <input type="text" id="hk-${id}" placeholder="Header (ej: Authorization)" value="${prefill?esc(prefill.key):''}" />
+    <input type="text" id="hv-${id}" placeholder="Valor (ej: Bearer token)" value="${prefill?esc(prefill.value):''}" />
+    <button class="param-del" onclick="document.getElementById('hr-${id}').remove()" title="Quitar">✕</button>
+  `;
+  document.getElementById('e-hdrs').appendChild(div);
+}
+
+// ─────────────────────────────────────────────────────────────
+// TESTER
+// ─────────────────────────────────────────────────────────────
+function openTester(id) {
+  const fn = S.fns.find(f => f.id === id);
+  if (!fn) return;
+  S.activeFn = id;
+
+  // Título
+  document.getElementById('tester-name').textContent = fn.name;
+  const pill = document.getElementById('tester-method-pill');
+  pill.className = `method-pill pill-${fn.method.toLowerCase()}`;
+  pill.textContent = fn.method;
+
+  // Inputs de parámetros
+  const container = document.getElementById('run-params');
+  if (!fn.params.length) {
+    container.innerHTML = '<div style="font-size:0.78rem;color:#374151">Esta función no tiene parámetros configurados</div>';
+  } else {
+    container.innerHTML = fn.params.map(p => `
+      <div class="param-input-row">
+        <div class="param-input-label">
+          ${esc(p.name)}
+          <span class="req-badge ${p.required ? 'rb-req' : 'rb-opt'}">${p.required ? '✅ Obligatorio' : '⬜ Opcional'}</span>
+        </div>
+        <input type="text" id="run-p-${p.name}" placeholder="${p.type === 'boolean' ? 'true / false' : p.type === 'number' ? '0' : 'valor...'}" oninput="updateUrlPreview()" />
+        ${p.description ? `<div class="param-input-desc">${esc(p.description)}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // Reset outputs
+  document.getElementById('req-placeholder').style.display = 'flex';
+  document.getElementById('req-content').style.display = 'none';
+  document.getElementById('res-placeholder').style.display = 'flex';
+  document.getElementById('res-content').style.display = 'none';
+  document.getElementById('res-status-badge').textContent = '';
+  document.getElementById('history-section').style.display = 'none';
+
+  updateUrlPreview();
+  showView('tester');
+}
+
+function updateUrlPreview() {
+  const fn = S.fns.find(f => f.id === S.activeFn);
+  if (!fn) return;
+  document.getElementById('run-url-preview').textContent = fn.url;
+}
+
+async function runCall() {
+  const fn = S.fns.find(f => f.id === S.activeFn);
+  if (!fn) return;
+
+  // Recolectar parámetros
+  const args = {};
+  for (const p of fn.params) {
+    const el = document.getElementById(`run-p-${p.name}`);
+    if (!el) continue;
+    const raw = el.value.trim();
+    if (!raw && p.required) {
+      el.focus();
+      el.style.borderColor = '#ef4444';
+      setTimeout(() => el.style.borderColor = '', 2000);
+      alert(`El parámetro "${p.name}" es obligatorio`);
+      return;
+    }
+    if (!raw) continue;
+    if (p.type === 'number') args[p.name] = Number(raw);
+    else if (p.type === 'boolean') args[p.name] = raw.toLowerCase() === 'true';
+    else args[p.name] = raw;
+  }
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Ejecutando...';
+
+  // Build request
+  const headers = { 'Content-Type': 'application/json' };
+  (fn.headers || []).forEach(h => { if (h.key) headers[h.key] = h.value; });
+
+  let url = fn.url;
+  const opts = { method: fn.method, headers };
+
+  if (fn.method === 'GET') {
+    const params = new URLSearchParams(args);
+    if (params.toString()) url += (url.includes('?') ? '&' : '?') + params.toString();
+  } else {
+    opts.body = JSON.stringify(args);
+  }
+
+  // Show request
+  document.getElementById('req-placeholder').style.display = 'none';
+  document.getElementById('req-content').style.display = 'block';
+  document.getElementById('req-method-line').textContent = fn.method;
+  document.getElementById('req-url-line').textContent = url;
+
+  const reqDisplay = fn.method !== 'GET' && Object.keys(args).length
+    ? `Headers:\n${Object.entries(headers).map(([k,v]) => `  ${k}: ${k.toLowerCase().includes('key')||k.toLowerCase().includes('auth') ? '***' : v}`).join('\n')}\n\nBody:\n${syntaxHL(JSON.stringify(args, null, 2))}`
+    : `Headers:\n${Object.entries(headers).map(([k,v]) => `  ${k}: ${k.toLowerCase().includes('key')||k.toLowerCase().includes('auth') ? '***' : v}`).join('\n')}`;
+  document.getElementById('req-body').innerHTML = reqDisplay;
+
+  // Execute
+  const t0 = Date.now();
+  let status = null, statusText = '', responseText = '', ok = false;
+  try {
+    const res = await fetch(url, opts);
+    status = res.status;
+    statusText = res.statusText;
+    ok = res.ok;
+    responseText = await res.text();
+  } catch (err) {
+    status = 0;
+    statusText = 'Network Error';
+    responseText = err.message;
+    ok = false;
+  }
+  const ms = Date.now() - t0;
+
+  // Show response
+  document.getElementById('res-placeholder').style.display = 'none';
+  document.getElementById('res-content').style.display = 'block';
+
+  const statusEl = document.getElementById('res-status-line');
+  statusEl.className = 'status-line ' + (ok ? 'status-ok' : 'status-err');
+  statusEl.textContent = status ? `${status} ${statusText}  ·  ${ms}ms` : `Error de red: ${statusText}`;
+
+  const badgeEl = document.getElementById('res-status-badge');
+  badgeEl.style.cssText = `font-size:0.72rem;font-weight:700;font-family:monospace;${ok ? 'color:#4ade80' : 'color:#f87171'}`;
+  badgeEl.textContent = status ? `${status} · ${ms}ms` : 'Error';
+
+  let prettyResponse;
+  try {
+    prettyResponse = syntaxHL(JSON.stringify(JSON.parse(responseText), null, 2));
+  } catch {
+    prettyResponse = esc(responseText);
+  }
+  document.getElementById('res-body').innerHTML = prettyResponse;
+
+  // History
+  S.history.unshift({
+    fn: fn.name, method: fn.method, url,
+    args, status, ms, ok, response: responseText,
+    time: new Date().toLocaleTimeString('es'),
+  });
+  renderHistory();
+
+  btn.disabled = false;
+  btn.textContent = '▶ Ejecutar';
+}
+
+function renderHistory() {
+  const section = document.getElementById('history-section');
+  const list    = document.getElementById('history-list');
+  if (!S.history.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  list.innerHTML = S.history.slice(0, 8).map((h, i) => `
+    <div class="history-item">
+      <div class="history-header" onclick="toggleHistory(${i})">
+        <span class="method-pill pill-${h.method.toLowerCase()}">${h.method}</span>
+        <span class="history-fn">${esc(h.fn)}</span>
+        <span style="font-size:0.72rem;color:#475569;font-family:monospace">${JSON.stringify(h.args).substring(0,50)}${JSON.stringify(h.args).length>50?'…':''}</span>
+        <span class="history-time">${h.time}</span>
+        <span class="history-status ${h.ok ? 'hs-ok' : 'hs-err'}">${h.status || 'ERR'} · ${h.ms}ms</span>
+      </div>
+      <div class="history-detail" id="hd-${i}">
+        <div>
+          <div style="font-size:0.68rem;font-weight:700;color:#475569;margin-bottom:6px;text-transform:uppercase">Request</div>
+          <pre style="font-family:monospace;font-size:0.75rem;color:#64748b;white-space:pre-wrap;word-break:break-all">${esc(h.url)}\n\n${JSON.stringify(h.args, null, 2)}</pre>
+        </div>
+        <div>
+          <div style="font-size:0.68rem;font-weight:700;color:#475569;margin-bottom:6px;text-transform:uppercase">Response</div>
+          <div style="font-family:monospace;font-size:0.75rem;color:${h.ok?'#4ade80':'#f87171'};margin-bottom:4px">${h.status} · ${h.ms}ms</div>
+          <pre style="font-family:monospace;font-size:0.75rem;color:#64748b;white-space:pre-wrap;word-break:break-all;max-height:150px;overflow-y:auto">${prettyTrunc(h.response, 400)}</pre>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleHistory(i) {
+  const el = document.getElementById(`hd-${i}`);
+  el.classList.toggle('open');
+}
+
+// ─────────────────────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function syntaxHL(json) {
+  return esc(json).replace(
+    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    m => {
+      if (/^"/.test(m)) return /:$/.test(m) ? `<span class="key">${m}</span>` : `<span class="str">${m}</span>`;
+      if (/true|false/.test(m)) return `<span class="bool">${m}</span>`;
+      if (/null/.test(m)) return `<span class="null">${m}</span>`;
+      return `<span class="num">${m}</span>`;
+    }
+  );
+}
+
+function prettyTrunc(text, max) {
+  try {
+    const pretty = JSON.stringify(JSON.parse(text), null, 2);
+    return esc(pretty.length > max ? pretty.substring(0, max) + '\n…' : pretty);
+  } catch {
+    return esc(text.length > max ? text.substring(0, max) + '…' : text);
+  }
+}
+
+// ── Init ──
+function initApp() {
+  renderSidebar();
+  if (S.fns.length) {
+    S.activeFn = S.fns[0].id;
+    renderSidebar();
+    openTester(S.fns[0].id);
+  }
+}
+
+// Correr init si ya estaba autenticado al cargar
+if (sessionStorage.getItem(SESSION_KEY) === '1') initApp();
+</script>
+</body>
+</html>
